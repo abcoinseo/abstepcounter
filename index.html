@@ -8,30 +8,30 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(to bottom, #12c2e9, #c471ed, #f64f59); /* Gradient background */
+            background: linear-gradient(to bottom, #12c2e9, #c471ed, #f64f59);
             color: #fff;
             text-align: center;
             margin: 0;
             padding: 0;
             overflow-x: hidden;
-            height: 100vh; /* Full height for background effect */
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            justify-content: flex-start; /* Align content to the top */
+            justify-content: flex-start;
         }
 
         .container {
             max-width: 600px;
             margin: 20px auto;
             padding: 20px;
-            background-color: rgba(255, 255, 255, 0.1); /* Semi-transparent container */
+            background-color: rgba(255, 255, 255, 0.1);
             border-radius: 15px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
 
         .header {
             display: flex;
-            justify-content: center; /* Center the title */
+            justify-content: center;
             align-items: center;
             padding: 10px 0;
         }
@@ -74,7 +74,7 @@
         }
 
         .progress-circle .progress-bar--foreground {
-            stroke: linear-gradient(to right, #f64f59, #c471ed, #12c2e9); /* Colorful progress */
+            stroke: linear-gradient(to right, #f64f59, #c471ed, #12c2e9);
         }
 
         .details {
@@ -156,31 +156,6 @@
             padding: 10px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
-
-        /* Responsive Design */
-        @media (max-width: 480px) {
-            .container {
-                padding: 10px;
-            }
-
-            .header {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .header h1 {
-                font-size: 1.8em;
-            }
-
-            .step-count {
-                font-size: 4em;
-            }
-
-            .details {
-                flex-direction: column;
-                align-items: center;
-            }
-        }
     </style>
 </head>
 <body>
@@ -241,25 +216,7 @@
 </div>
 
 <script>
-   // Feature Detection for Background Step Counting
-  if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js')
-              .then(registration => {
-                  console.log('Service Worker registered:', registration);
-              })
-              .catch(error => {
-                  console.log('Service Worker registration failed:', error);
-              });
-      });
-  } else {
-      console.log('Service Workers are not supported.');
-      //Inform user that background counting is unavailable, suggesting they keep the app open for accurate step counting
-      alert("Background Step Counting not available. Keep the app open for accurate step counting");
-  }
-
-
-   // Location Permission Request
+    // Location Permission Request
     function requestLocationPermission() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -287,6 +244,10 @@
     let activeTime = 0;
     let floors = 0;
     let stepGoal = localStorage.getItem('stepGoal') ? parseInt(localStorage.getItem('stepGoal')) : 10000;
+    let lastAccelerationMagnitude = 0; // Track the last acceleration magnitude
+    let stationaryTimeout; // Track the timeout
+    const stationaryThreshold = 1;  //How long in seconds before considering the user Stationary
+    const movementThreshold = 0.5; // How different acceleration needs to be to count
 
     function startStepCounting() {
 
@@ -297,22 +258,33 @@
                 const gyroscope = new Gyroscope({ frequency: 60 });
 
                 accelerometer.addEventListener('reading', () => {
-                    // Simple step detection logic (replace with more sophisticated algorithm)
                     const accelerationMagnitude = Math.sqrt(accelerometer.x ** 2 + accelerometer.y ** 2 + accelerometer.z ** 2);
 
-                    //Basic Step logic - needs refinement
-                    if (accelerationMagnitude > 10) { // Adjust threshold as needed
+                    // Use the absolute difference from the last recorded magnitude
+                    const accelerationChange = Math.abs(accelerationMagnitude - lastAccelerationMagnitude);
+
+
+                     //If there is change to the movement: stop the stationary Timeout
+                    if (accelerationChange > movementThreshold) {
+                        clearTimeout(stationaryTimeout);
+
+                        // If stationaryTimeout has run, it means that the step has been counted
+                        stationaryTimeout = setTimeout(() => {
+
+                        }, stationaryThreshold * 1000);
+
                         stepCount++;
                         distance = stepCount * 0.0005; // Example: 0.0005 miles per step
                         calories = stepCount * 0.04; // Example: 0.04 kcal per step
                         activeTime = stepCount * 0.01; //Example: 0.01 minutes per step
                         floors = Math.floor(stepCount / 200); //Rough estimation.
 
-
-
                         updateDisplay();
                         updateProgressBar();
                     }
+
+                    lastAccelerationMagnitude = accelerationMagnitude; // Update the last magnitude
+
                 });
 
                 accelerometer.addEventListener('error', (event) => {
@@ -337,18 +309,27 @@
 
         } else if ('DeviceMotionEvent' in window) { // Fallback to DeviceMotionEvent (less accurate)
             window.addEventListener('devicemotion', (event) => {
-                // More basic accelerometer data available
-                let acceleration = event.accelerationIncludingGravity;
+               const acceleration = event.accelerationIncludingGravity;
+               if (acceleration) {
+                    const accelerationMagnitude = Math.sqrt(acceleration.x ** 2 + acceleration.y ** 2 + acceleration.z ** 2);
+                    const accelerationChange = Math.abs(accelerationMagnitude - lastAccelerationMagnitude);
 
-                if (acceleration.x > 12 || acceleration.y > 12 || acceleration.z > 12) {
-                    stepCount++;
-                    distance = stepCount * 0.0005;
-                    calories = stepCount * 0.04;
-                    activeTime = stepCount * 0.01;
-                    floors = Math.floor(stepCount / 200);
-                    updateDisplay();
-                    updateProgressBar();
+                    if (accelerationChange > movementThreshold) {
+                        clearTimeout(stationaryTimeout);
+
+                        stationaryTimeout = setTimeout(() => {
+                        }, stationaryThreshold * 1000);
+
+                        stepCount++;
+                        distance = stepCount * 0.0005;
+                        calories = stepCount * 0.04;
+                        activeTime = stepCount * 0.01;
+                        floors = Math.floor(stepCount / 200);
+                        updateDisplay();
+                        updateProgressBar();
+                    }
                 }
+                 lastAccelerationMagnitude = accelerationMagnitude;
             });
         } else {
             alert("Step counting not supported on this device. Motion sensors are required.");
@@ -538,14 +519,6 @@
         }
         stepChart.update();
     }
-    document.addEventListener('deviceready', function () {
-        cordova.plugins.backgroundMode.enable();
-
-        cordova.plugins.backgroundMode.on('activate', function() {
-                console.log("Running in background");
-             //Your Step Counting Code Here;
-        });
-    }, false);
 
      // Initialization
     initializeChart();
