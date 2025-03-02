@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Step Counter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to bottom, #12c2e9, #c471ed, #f64f59); /* Gradient background */
+            color: #fff;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            height: 100vh; /* Full height for background effect */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start; /* Align content to the top */
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: rgba(255, 255, 255, 0.1); /* Semi-transparent container */
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .header {
+            display: flex;
+            justify-content: center; /* Center the title */
+            align-items: center;
+            padding: 10px 0;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .step-count {
+            font-size: 5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .progress-circle {
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+            position: relative;
+        }
+
+        .progress-circle svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .progress-circle .progress-bar {
+            fill: none;
+            stroke-width: 12;
+            stroke-linecap: round;
+            transform-origin: center;
+            transform: rotate(-90deg);
+        }
+
+        .progress-circle .progress-bar--background {
+            stroke: rgba(255, 255, 255, 0.3);
+        }
+
+        .progress-circle .progress-bar--foreground {
+            stroke: linear-gradient(to right, #f64f59, #c471ed, #12c2e9); /* Colorful progress */
+        }
+
+        .details {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            margin-top: 20px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .detail-item {
+            margin: 10px;
+        }
+
+        .detail-item i {
+            font-size: 1.7em;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+
+        .day-selector {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .day-selector button {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #fff;
+            padding: 10px;
+            margin: 0 5px;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .day-selector button:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .day-selector button.active {
+            background-color: #fff;
+            color: #000;
+        }
+
+        #locationModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #locationModalContent {
+            background-color: white;
+            color: black;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        #stepChartContainer {
+            width: 100%;
+            max-width: 600px;
+            margin: 20px auto;
+        }
+
+        canvas#stepChart {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .step-count {
+                font-size: 4em;
+            }
+
+            .details {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="locationModal">
+    <div id="locationModalContent">
+        <h2>Location Permission Required</h2>
+        <p>This app needs location access to track your steps accurately.</p>
+        <button onclick="requestLocationPermission()">Grant Permission</button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="header">
+        <h1>Step Counter</h1>
+    </div>
+    <div class="step-count" id="stepCount">0</div>
+
+    <div class="progress-circle">
+        <svg>
+            <circle class="progress-bar progress-bar--background" cx="100" cy="100" r="90"></circle>
+            <circle class="progress-bar progress-bar--foreground" cx="100" cy="100" r="90" id="progressBar"></circle>
+        </svg>
+    </div>
+
+    <div class="details">
+        <div class="detail-item">
+            <i class="material-icons">location_on</i>
+            <span id="distance">0.0</span> Miles
+        </div>
+        <div class="detail-item">
+            <i class="material-icons">whatshot</i>
+            <span id="calories">0</span> KCAL
+        </div>
+        <div class="detail-item">
+            <i class="material-icons">timer</i>
+            <span id="activeTime">0</span> Min
+        </div>
+        <div class="detail-item">
+            <i class="material-icons">stairs</i>
+            <span id="floors">0</span> Floors
+        </div>
+    </div>
+
+    <div class="day-selector">
+        <button data-day="sun">SUN</button>
+        <button data-day="mon">MON</button>
+        <button data-day="tue">TUE</button>
+        <button data-day="wed">WED</button>
+        <button data-day="thu">THU</button>
+        <button data-day="fri">FRI</button>
+        <button data-day="sat">SAT</button>
+    </div>
+
+    <div id="stepChartContainer">
+        <canvas id="stepChart"></canvas>
+    </div>
+</div>
+
+<script>
+   // Feature Detection for Background Step Counting
+  if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+              .then(registration => {
+                  console.log('Service Worker registered:', registration);
+              })
+              .catch(error => {
+                  console.log('Service Worker registration failed:', error);
+              });
+      });
+  } else {
+      console.log('Service Workers are not supported.');
+      //Inform user that background counting is unavailable, suggesting they keep the app open for accurate step counting
+      alert("Background Step Counting not available. Keep the app open for accurate step counting");
+  }
+
+
+   // Location Permission Request
+    function requestLocationPermission() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function() {
+                    document.getElementById('locationModal').style.display = 'none';
+                    startStepCounting();
+                },
+                function(error) {
+                    alert("Location permission denied. Step counting may be less accurate.");
+                    document.getElementById('locationModal').style.display = 'none';
+                    startStepCounting();
+                },
+                { enableHighAccuracy: true }
+            );
+        } else {
+            alert("Geolocation is not supported by this browser.");
+            startStepCounting();
+        }
+    }
+
+    // Step Counting Logic
+    let stepCount = 0;
+    let distance = 0;
+    let calories = 0;
+    let activeTime = 0;
+    let floors = 0;
+    let stepGoal = localStorage.getItem('stepGoal') ? parseInt(localStorage.getItem('stepGoal')) : 10000;
+
+    function startStepCounting() {
+
+        // Check if the Sensor API is supported
+        if ('Accelerometer' in window && 'Gyroscope' in window) {
+            try {
+                const accelerometer = new Accelerometer({ frequency: 60 });
+                const gyroscope = new Gyroscope({ frequency: 60 });
+
+                accelerometer.addEventListener('reading', () => {
+                    // Simple step detection logic (replace with more sophisticated algorithm)
+                    const accelerationMagnitude = Math.sqrt(accelerometer.x ** 2 + accelerometer.y ** 2 + accelerometer.z ** 2);
+
+                    //Basic Step logic - needs refinement
+                    if (accelerationMagnitude > 10) { // Adjust threshold as needed
+                        stepCount++;
+                        distance = stepCount * 0.0005; // Example: 0.0005 miles per step
+                        calories = stepCount * 0.04; // Example: 0.04 kcal per step
+                        activeTime = stepCount * 0.01; //Example: 0.01 minutes per step
+                        floors = Math.floor(stepCount / 200); //Rough estimation.
+
+
+
+                        updateDisplay();
+                        updateProgressBar();
+                    }
+                });
+
+                accelerometer.addEventListener('error', (event) => {
+                    console.error("Accelerometer error:", event);
+                });
+
+                gyroscope.addEventListener('reading', () => {
+                    // Can use gyroscope data for improved accuracy later on
+                });
+
+                gyroscope.addEventListener('error', (event) => {
+                    console.error("Gyroscope error:", event);
+                });
+
+
+                accelerometer.start();
+                gyroscope.start();
+            } catch (error) {
+                console.error("Error initializing sensors:", error);
+                alert("Sensors not supported or unavailable on this device.");
+            }
+
+        } else if ('DeviceMotionEvent' in window) { // Fallback to DeviceMotionEvent (less accurate)
+            window.addEventListener('devicemotion', (event) => {
+                // More basic accelerometer data available
+                let acceleration = event.accelerationIncludingGravity;
+
+                if (acceleration.x > 12 || acceleration.y > 12 || acceleration.z > 12) {
+                    stepCount++;
+                    distance = stepCount * 0.0005;
+                    calories = stepCount * 0.04;
+                    activeTime = stepCount * 0.01;
+                    floors = Math.floor(stepCount / 200);
+                    updateDisplay();
+                    updateProgressBar();
+                }
+            });
+        } else {
+            alert("Step counting not supported on this device. Motion sensors are required.");
+        }
+
+        function updateDisplay() {
+            document.getElementById('stepCount').innerText = stepCount;
+            document.getElementById('distance').innerText = distance.toFixed(1);
+            document.getElementById('calories').innerText = calories.toFixed(0);
+            document.getElementById('activeTime').innerText = activeTime.toFixed(0);
+            document.getElementById('floors').innerText = floors;
+        }
+
+        function updateProgressBar() {
+            const progress = Math.min(stepCount / stepGoal, 1);
+            const circumference = 2 * Math.PI * 90;
+            const offset = circumference * (1 - progress);
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.strokeDasharray = circumference;
+            progressBar.style.strokeDashoffset = offset;
+        }
+
+        // Local Storage for Daily Data
+        function saveDailyData() {
+            const today = new Date().toLocaleDateString();
+            const data = {
+                steps: stepCount,
+                distance: distance,
+                calories: calories,
+                activeTime: activeTime,
+                floors: floors
+            };
+            localStorage.setItem(today, JSON.stringify(data));
+            updateChartData();
+        }
+
+        function loadDailyData() {
+            const today = new Date().toLocaleDateString();
+            const savedData = localStorage.getItem(today);
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                stepCount = data.steps;
+                distance = data.distance;
+                calories = data.calories;
+                activeTime = data.activeTime;
+                floors = data.floors;
+                updateDisplay();
+                updateProgressBar();
+            }
+        }
+
+         setInterval(saveDailyData, 60000);
+         loadDailyData();
+
+    }
+     //Day selector
+     const dayButtons = document.querySelectorAll('.day-selector button');
+        dayButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            dayButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            // Here, you would load the step count data for the selected day
+            loadStepDataForDay(button.dataset.day);
+        });
+        });
+
+    function loadStepDataForDay(day) {
+        let date;
+
+        switch (day) {
+            case 'sun':
+                date = getDateOfPastDay(0);
+                break;
+            case 'mon':
+                date = getDateOfPastDay(1);
+                break;
+            case 'tue':
+                date = getDateOfPastDay(2);
+                break;
+            case 'wed':
+                date = getDateOfPastDay(3);
+                break;
+            case 'thu':
+                date = getDateOfPastDay(4);
+                break;
+            case 'fri':
+                date = getDateOfPastDay(5);
+                break;
+            case 'sat':
+                date = getDateOfPastDay(6);
+                break;
+            default:
+                console.error("Invalid day:", day);
+                return;
+        }
+
+        const savedData = localStorage.getItem(date);
+        if (savedData) {
+            const data = JSON.parse(savedData);
+            stepCount = data.steps;
+            distance = data.distance;
+            calories = data.calories;
+            activeTime = data.activeTime;
+            floors = data.floors;
+            updateDisplay();
+            updateProgressBar();
+        } else {
+            stepCount = 0;
+            distance = 0;
+            calories = 0;
+            activeTime = 0;
+            floors = 0;
+            updateDisplay();
+            updateProgressBar();
+        }
+    }
+
+    function getDateOfPastDay(daysAgo) {
+        const today = new Date();
+        const pastDate = new Date(today);
+        pastDate.setDate(today.getDate() - daysAgo);
+        return pastDate.toLocaleDateString();
+    }
+
+    // Chart Logic
+    let stepChart;
+    let chartData = {
+        labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        datasets: [{
+            label: 'Steps',
+            data: [0, 0, 0, 0, 0, 0, 0],
+            backgroundColor: 'rgba(255, 255, 255, 0.2)', // Translucent white bars
+            borderColor: '#fff',
+            borderWidth: 2
+        }]
+    };
+
+    function initializeChart() {
+        const ctx = document.getElementById('stepChart').getContext('2d');
+        stepChart = new Chart(ctx, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                         ticks: {
+                            color: 'white' // Set Y axis label color
+                        },
+                        grid: {
+                            color: 'rgba(255,255,255,0.1)' // Set grid line color
+                        }
+                    },
+                    x: {
+                         ticks: {
+                            color: 'white' // Set Y axis label color
+                        },
+                        grid: {
+                            color: 'rgba(255,255,255,0.1)' // Set grid line color
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false // Hide the legend
+                    }
+                }
+            }
+        });
+    }
+
+    function updateChartData() {
+        const today = new Date();
+        chartData.datasets[0].data = [];
+
+        for (let i = 6; i >= 0; i--) {
+            const pastDate = new Date(today);
+            pastDate.setDate(today.getDate() - i);
+            const dateString = pastDate.toLocaleDateString();
+            const savedData = localStorage.getItem(dateString);
+            let steps = 0;
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                steps = data.steps;
+            }
+            chartData.datasets[0].data.unshift(steps);
+        }
+        stepChart.update();
+    }
+    document.addEventListener('deviceready', function () {
+        cordova.plugins.backgroundMode.enable();
+
+        cordova.plugins.backgroundMode.on('activate', function() {
+                console.log("Running in background");
+             //Your Step Counting Code Here;
+        });
+    }, false);
+
+     // Initialization
+    initializeChart();
+    updateChartData();
+
+     // Check for location permission on page load
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function() {
+                startStepCounting();
+            },
+            function() {
+                document.getElementById('locationModal').style.display = 'flex';
+            }
+        );
+    } else {
+        startStepCounting();
+    }
+
+</script>
+</body>
+</html>
